@@ -1,0 +1,598 @@
+import pygame
+import random
+import math
+from player import Player
+from settings import *
+from enemy import Enemy
+from pygame import mixer
+from bullet import Bullet, EnemyBullet
+
+# inintialize the pygame
+pygame.init()
+
+#creating a screen
+screen=pygame.display.set_mode((800,600))
+clock = pygame.time.Clock()
+clock.tick(120)
+
+print("Game Started") 
+
+# create player
+player = Player()
+
+# create enemies
+enemies = []
+
+for i in range(NUM_ENEMIES):
+    enemies.append(Enemy())
+
+# create bullets
+bullet = Bullet()
+
+# create enemy bullets
+enemy_bullets = []
+for enemy in enemies:
+    enemy_bullets.append(EnemyBullet())
+
+
+# game menu
+game_state= "menu"
+
+# warning timer
+warningTimer=0
+
+# background image
+background = pygame.image.load("assets/background.png").convert_alpha()
+background = pygame.transform.scale(background, (800, 600))
+
+# background sound
+mixer.music.load("assets/reze.wav")
+mixer.music.play(-1)
+
+
+# Title and Icon
+pygame.display.set_caption("Battle for the quest of Tsundere")
+icon= pygame.image.load("assets/nazi-party-flag-1.jpg.webp")
+pygame.display.set_icon(icon)
+
+
+# player image
+playerImg = pygame.image.load("assets/hero.png").convert_alpha()
+playerImg = pygame.transform.scale(playerImg, (100, 100))
+playerX=370
+playerY=480
+playerX_change=0
+
+# enemy
+enemyImg=[]
+enemytype=[]
+enemyX=[]
+enemyY=[]
+enemyX_change=[]
+enemyY_change=[]
+num_of_enemies= 6
+
+# enemy bullets
+# Enemy Bullet
+enemyBulletImg = pygame.image.load("assets/food.png").convert_alpha()
+enemyBulletImg = pygame.transform.scale(enemyBulletImg, (32,32))
+
+enemyBulletX = [0] * num_of_enemies
+enemyBulletY = [0] * num_of_enemies
+enemyBulletState = ["ready"] * num_of_enemies
+enemyBulletSpeed = 3
+
+for i in range(num_of_enemies):
+
+    enemytype.append(random.randint(1,3))
+    if enemytype[i]==1:
+
+        enemyImg.append(
+            pygame.image.load("assets/enemy.webp").convert_alpha()
+        )
+
+    elif enemytype[i]==2:
+
+        enemyImg.append(
+            pygame.image.load("assets/fast_enemy.png").convert_alpha()
+        )
+
+    else:
+
+        enemyImg.append(
+            pygame.image.load("assets/tank_enemy.png").convert_alpha()
+        )
+    enemyImg[i]=pygame.transform.scale(enemyImg[i],(64,64))
+
+    if enemytype[i] == 1:
+        speed = 0.8
+
+    elif enemytype[i] == 2:
+        speed = 1.5
+
+    else:
+        speed = 0.5
+
+    enemyX_change.append(speed)
+    enemyY_change.append(50)
+
+# bullet
+bulletImg = pygame.image.load("assets/food.png").convert_alpha()
+bulletImg = pygame.transform.scale(bulletImg, (64, 64))
+bulletX=0
+bulletY=480
+bulletX_change=0
+bulletY_change=8
+# ready state means you can't see the bullet on the screen
+# fire state means the bullet is currently moving
+bullet_state="ready"
+
+
+# explosion sound
+# Explosion
+
+explosionImg = pygame.image.load("assets/explosion.png").convert_alpha()
+explosionImg = pygame.transform.scale(explosionImg,(80,80))
+
+explosionX = 0
+explosionY = 0
+explosionTimer = 0
+
+# score
+score_value=0
+level=1
+# ---------------- PLAYER ----------------
+
+lives = 3
+hit_timer = 0
+font=pygame.font.Font("freesansbold.ttf",32)
+
+textX=10
+textY=10
+
+
+# showing the score
+def show_score():
+
+    score = font.render(f"Score : {score_value}",True,(255,255,255))
+    screen.blit(score,(10,10))
+
+    high = font.render(f"High : {high_score}",True,(255,255,0))
+    screen.blit(high,(10,45))
+    
+
+    levelText = font.render(f"Level : {level}",True,(0,255,255))
+    screen.blit(levelText,(320,10))
+
+    # Draw Hearts
+    for i in range(lives):
+        pygame.draw.circle(
+            screen,
+            (255,0,0),
+            (720+i*22,30),
+            8
+        )
+        pygame.draw.circle(
+            screen,
+            (255,0,0),
+            (728+i*22,30),
+            8
+        )
+        pygame.draw.polygon(
+            screen,
+            (255,0,0),
+            [
+                (712+i*22,32),
+                (736+i*22,32),
+                (724+i*22,48)
+            ]
+        )
+
+
+# collision
+def iscollison(enemyX, enemyY, bulletX, bulletY):
+    distance=math.sqrt((math.pow(enemyX-bulletX,2))+(math.pow(enemyY-bulletY,2)))
+    if distance<27:
+        return True
+    else:
+        return False
+
+# game over text
+over_font=pygame.font.Font("freesansbold.ttf",100)
+
+def game_over_screen():
+
+    over = title_font.render("GAME OVER",True,(255,50,50))
+    screen.blit(over,over.get_rect(center=(400,170)))
+
+    score = menu_font.render(f"Final Score : {score_value}",True,(255,255,255))
+    screen.blit(score,score.get_rect(center=(400,260)))
+
+    high = menu_font.render(f"High Score : {high_score}",True,(255,255,0))
+    screen.blit(high,high.get_rect(center=(400,310)))
+
+    restart = menu_font.render("Press R to Restart",True,(0,255,0))
+    screen.blit(restart,restart.get_rect(center=(400,400)))
+
+    quit = menu_font.render("ESC to Quit",True,(255,255,255))
+    screen.blit(quit,quit.get_rect(center=(400,450)))
+
+def player(x,y):
+    screen.blit(playerImg, (x, y))
+def enemy(x,y,i):
+    screen.blit(enemyImg[i], (x, y))
+def fire_bullet(x,y):
+    global bullet_state
+    bullet_state="fire"
+    screen.blit(bulletImg, (x+16, y+10))
+def fire_enemy_bullet(x, y, i):
+
+    enemyBulletState[i] = "fire"
+
+    screen.blit(enemyBulletImg, (x+16, y+25))
+
+# draw explosion
+def draw_explosion():
+
+    global explosionTimer
+
+    if explosionTimer > 0:
+
+        screen.blit(explosionImg,(explosionX,explosionY))
+
+        explosionTimer -= 1
+
+
+
+
+
+# GAME TITLE
+title_font = pygame.font.Font("freesansbold.ttf",60)
+menu_font = pygame.font.Font("freesansbold.ttf",30)
+
+def draw_menu():
+
+    screen.blit(background,(0,0))
+
+    title = title_font.render("Battle for the quest of Tsundere",True,(255,255,255))
+    screen.blit(title,title.get_rect(center=(400,150)))
+
+    press = menu_font.render("Press SPACE to Start",True,(255,255,0))
+    screen.blit(press,press.get_rect(center=(400,300)))
+
+    quit = menu_font.render("ESC = Quit",True,(200,200,200))
+    screen.blit(quit,quit.get_rect(center=(400,360)))
+
+# pause screen
+def draw_pause():
+
+    pause = title_font.render("PAUSED",True,(255,255,255))
+    screen.blit(pause,pause.get_rect(center=(400,250)))
+
+    press = menu_font.render("Press P to Continue",True,(255,255,0))
+    screen.blit(press,press.get_rect(center=(400,330)))
+
+def player_hit():
+
+    text = menu_font.render(
+        "OUCH!",
+        True,
+        (255,80,80)
+    )
+
+    screen.blit(
+        text,
+        text.get_rect(center=(400,560))
+    )
+
+def player_collision(px, py, bx, by):
+
+    distance = math.sqrt(
+        (px-bx)**2 +
+        (py-by)**2
+    )
+
+    return distance < 40
+
+def draw_warning():
+
+    global warningTimer
+
+    if warningTimer>0:
+
+        txt=title_font.render(
+            "WARNING",
+            True,
+            (255,0,0)
+        )
+
+        screen.blit(txt,
+        txt.get_rect(center=(400,300)))
+
+        warningTimer-=1
+
+# high score
+try:
+    with open("highscore.txt", "r") as f:
+        high_score = int(f.read())
+except:
+    high_score = 0
+
+# creating loop for closing the game
+running = True
+while running:
+
+    # Limit FPS
+    clock.tick(120)
+
+    # Draw background
+    screen.fill((0,0,0))
+    screen.blit(background, (0,0))
+
+    # ---------------- EVENTS ----------------
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+
+            # MENU
+            if game_state == "menu":
+
+                if event.key == pygame.K_SPACE:
+                    game_state = "playing"
+
+                elif event.key == pygame.K_ESCAPE:
+                    running = False
+
+            # GAME OVER
+            elif game_state == "game_over":
+                playerX_change = 0
+
+                if event.key == pygame.K_r:
+
+                    score_value = 0
+
+                    lives = 3
+                    level = 1
+                    warningTimer = 0
+                    enemyBulletSpeed = 3
+                    hit_timer = 0
+                    playerX = 370
+                    bulletY = 480
+                    bullet_state = "ready"
+          
+                    for i in range(num_of_enemies):
+                        enemyX[i] = random.randint(0,736)
+                        enemyY[i] = random.randint(50,150)
+
+                    game_state = "playing"
+
+                elif event.key == pygame.K_ESCAPE:
+                    running = False
+
+            # PLAYING
+            elif game_state == "playing":
+
+                if event.key == pygame.K_LEFT:
+                    playerX_change = -0.8
+
+                elif event.key == pygame.K_RIGHT:
+                    playerX_change = 0.8
+
+                elif event.key == pygame.K_SPACE:
+
+                    if bullet_state == "ready":
+                        bullet_sound.play()
+
+                        bulletX = playerX
+                        fire_bullet(bulletX, bulletY)
+
+                elif event.key == pygame.K_p:
+                    game_state = "paused"
+
+            # PAUSED
+            elif game_state == "paused":
+
+                if event.key == pygame.K_p:
+                    game_state = "playing"
+
+        if event.type == pygame.KEYUP:
+
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                playerX_change = 0
+
+    # ---------------- SCREENS ----------------
+
+    if game_state == "menu":
+        draw_menu()
+        pygame.display.update()
+        continue
+
+    if game_state == "paused":
+        draw_pause()
+        pygame.display.update()
+        continue
+
+    if game_state == "game_over":
+        game_over_screen()
+        pygame.display.update()
+        continue
+
+    # ---------------- PLAYER ----------------
+
+    playerX += playerX_change
+
+    if playerX < 0:
+        playerX = 0
+
+    if playerX > 700:
+        playerX = 700
+
+    # ---------------- ENEMIES ----------------
+
+    for i in range(num_of_enemies):
+
+        if enemyY[i] > 430:
+
+            lives -= 1
+
+            hit_timer = 60
+
+            enemyX[i] = random.randint(0,736)
+            enemyY[i] = random.randint(50,150)
+
+            if lives <= 0:
+
+                if score_value > high_score:
+
+                    high_score = score_value
+
+                    with open("highscore.txt","w") as f:
+                        f.write(str(high_score))
+
+                game_state = "game_over"
+            break
+
+        enemyX[i] += enemyX_change[i]
+
+        if enemyX[i] <= 0:
+            enemyX_change[i] = 0.8
+            enemyY[i] += enemyY_change[i]
+
+        elif enemyX[i] >= 736:
+            enemyX_change[i] = -0.8
+
+        collision = iscollison(enemyX[i], enemyY[i], bulletX, bulletY)
+
+        if collision:
+            bullet_sound = mixer.Sound("assets/laser.wav")
+            explosion_sound = mixer.Sound("assets/explosion.wav")
+            explosion_sound.play()
+
+            explosionX = enemyX[i]
+            explosionY = enemyY[i]
+
+            explosionTimer = 20
+
+            bulletY = 480
+            bullet_state = "ready"
+
+            enemytype[i]=random.randint(1,3)
+
+            enemyX[i]=random.randint(0,736)
+            enemyY[i]=random.randint(50,150)
+
+            if enemytype[i]==1:
+
+                enemyImg[i]=pygame.image.load("assets/enemy.webp").convert_alpha()
+
+            elif enemytype[i]==2:
+
+                enemyImg[i]=pygame.image.load("fast_enemy.png").convert_alpha()
+
+            else:
+
+                enemyImg[i]=pygame.image.load("assets/tank_enemy.png").convert_alpha()
+
+            enemyImg[i]=pygame.transform.scale(enemyImg[i],(64,64))
+
+            score_value += 1
+            level = score_value//10 + 1
+
+            # Every 10 kills increase difficulty
+            if score_value %10==0:
+
+                enemyBulletSpeed += 0.4
+
+                for j in range(num_of_enemies):
+
+                    if enemyX_change[j] > 0:
+                        enemyX_change[j] += 0.15
+
+                    else:
+                        enemyX_change[j] -= 0.15
+            if score_value==50:
+
+                warningTimer=180
+        for enemy in enemies:
+
+            enemy.move()
+            enemy.draw(screen)
+        enemy(enemyX[i], enemyY[i], i)
+        # Random enemy shooting
+        if enemyBulletState[i] == "ready":
+            shoot_chance = max(80, 300 - score_value * 3)
+
+
+            if random.randint(1,shoot_chance) == 1:
+                
+
+                enemyBulletX[i] = enemyX[i]
+                enemyBulletY[i] = enemyY[i]
+
+                enemyBulletState[i] = "fire"
+        if enemyBulletState[i] == "fire":
+
+            fire_enemy_bullet(enemyBulletX[i], enemyBulletY[i], i)
+
+            enemyBulletY[i] += enemyBulletSpeed
+
+            if enemyBulletY[i] > 600:
+
+                enemyBulletState[i] = "ready"
+        if enemyBulletState[i] == "fire":
+
+            if player_collision(playerX, playerY,
+                                enemyBulletX[i],
+                                enemyBulletY[i]):
+
+                enemyBulletState[i] = "ready"
+
+                lives -= 1
+
+                hit_timer = 60
+
+                if lives <= 0:
+
+                    if score_value > high_score:
+
+                        high_score = score_value
+
+                        with open("highscore.txt","w") as f:
+                            f.write(str(high_score))
+
+                    game_state = "game_over"
+
+    # ---------------- BULLET ----------------
+
+    # if bullet_state == "fire":
+
+    #     fire_bullet(bulletX, bulletY)
+
+    #     bulletY -= bulletY_change
+
+    #     if bulletY <= 0:
+
+    #         bulletY = 480
+    #         bullet_state = "ready"
+
+    bullet.move()
+    bullet.draw(screen)
+
+    # ---------------- DRAW ----------------
+
+    player(playerX, playerY)
+    draw_explosion()
+    if hit_timer > 0:
+
+     player_hit()
+
+     hit_timer -= 1
+    show_score()
+
+    draw_warning()
+    pygame.display.update()
+
+pygame.quit()
