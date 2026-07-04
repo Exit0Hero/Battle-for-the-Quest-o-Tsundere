@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
